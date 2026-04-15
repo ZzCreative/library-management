@@ -1,1 +1,3 @@
-ECHO 处于打开状态。
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
