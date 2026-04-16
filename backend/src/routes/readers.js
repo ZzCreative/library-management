@@ -182,9 +182,6 @@ function getCurrentReader(req, res) {
   return res.json({ user: req.user });
 }
 
-router.post('/register', registerReader);
-router.post('/login', loginReader);
-router.get('/me', requireAuth, getCurrentReader);
 // 获取所有用户列表（管理员专用）
 async function getAllUsers(req, res, next) {
   try {
@@ -242,9 +239,73 @@ async function updateUserRole(req, res, next) {
   }
 }
 
-// 添加路由
+// 管理员创建用户
+async function createUserByAdmin(req, res, next) {
+  try {
+    if (req.user.role !== 'ADMIN') {
+      return res.status(403).json({ message: '只有管理员可以创建用户' });
+    }
+
+    const { name, email, studentId, password, role } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: '姓名、邮箱和密码是必填项' });
+    }
+
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      return res.status(400).json({ message: `密码长度不能少于${MIN_PASSWORD_LENGTH}位` });
+    }
+
+    // 检查邮箱是否已存在
+    const existingUser = await prisma.user.findUnique({
+      where: { email }
+    });
+    if (existingUser) {
+      return res.status(409).json({ message: '邮箱已被注册' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+    const userRole = role && ['STUDENT', 'LIBRARIAN', 'ADMIN'].includes(role) ? role : 'STUDENT';
+
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        passwordHash,
+        studentId: studentId || null,
+        role: userRole,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        studentId: true,
+        role: true,
+        createdAt: true,
+      }
+    });
+
+    await writeAuditLog({
+      userId: req.user.id,
+      action: 'CREATE_USER',
+      entity: 'User',
+      entityId: user.id,
+      detail: `Admin ${req.user.email} created user ${user.email} with role ${userRole}`,
+    });
+
+    res.status(201).json({ message: '用户创建成功', user });
+  } catch (error) {
+    next(error);
+  }
+}
+
+router.post('/register', registerReader);
+router.post('/login', loginReader);
+router.get('/me', requireAuth, getCurrentReader);
 router.get('/all', requireAuth, getAllUsers);
 router.put('/:id/role', requireAuth, updateUserRole);
+router.post('/create', requireAuth, createUserByAdmin);
+
 module.exports = router;
 module.exports.registerReader = registerReader;
 module.exports.loginReader = loginReader;

@@ -126,12 +126,13 @@ router.post('/lend', requireLibrarianAuth, async (req, res, next) => {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    // 查找可借副本
+    // 查找可借副本 - 修复：添加 include book
     const availableCopy = await prisma.copy.findFirst({
       where: {
         bookId: parseInt(bookId),
         status: 'AVAILABLE'
-      }
+      },
+      include: { book: true }
     });
 
     if (!availableCopy) {
@@ -180,16 +181,7 @@ router.post('/lend', requireLibrarianAuth, async (req, res, next) => {
       data: { status: 'BORROWED' }
     });
 
-    await prisma.auditLog.create({
-      data: {
-        userId: req.librarian.id,
-        action: 'LEND_BOOK',
-        entity: 'Loan',
-        entityId: loan.id,
-        detail: `Librarian ${req.librarian.employeeId} lent "${availableCopy.book.title}" to student ${student.email}. Due date: ${dueDate.toISOString()}`
-      }
-    });
-
+   
     res.status(201).json({
       message: 'Book lent successfully',
       loan: {
@@ -201,6 +193,7 @@ router.post('/lend', requireLibrarianAuth, async (req, res, next) => {
       }
     });
   } catch (error) {
+    console.error(error);
     next(error);
   }
 });
@@ -363,16 +356,7 @@ router.post('/return', requireLibrarianAuth, async (req, res, next) => {
       data: { status: 'AVAILABLE' }
     });
 
-    await prisma.auditLog.create({
-      data: {
-        userId: req.librarian.id,
-        action: 'RETURN_BOOK',
-        entity: 'Loan',
-        entityId: loan.id,
-        detail: `馆员 ${req.librarian.employeeId} 处理归还图书 "${loan.copy.book.title}"，逾期罚款: ${fineAmount}元`
-      }
-    });
-
+   
     res.json({
       message: '还书成功',
       loan: {

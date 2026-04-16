@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react'
 
-const API_URL = 'http://localhost:3001/api'
-
 export default function LibrarianLogin({ onLogin, onSwitchToRegister }) {
   const [employeeId, setEmployeeId] = useState('')
   const [password, setPassword] = useState('')
@@ -67,19 +65,23 @@ export default function LibrarianLogin({ onLogin, onSwitchToRegister }) {
     setLoading(true)
 
     try {
-      const res = await fetch('http://localhost:3001/api/auth/login', {
+      const res = await fetch('http://localhost:3001/api/librarian/auth/login-librarian', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: employeeId, password, type: 'librarian' })
+        body: JSON.stringify({ employeeId, password })
       })
 
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || '登录失败')
+        setError(data.error || data.message || '登录失败')
         setLoading(false)
         return
       }
+
+      // 存储 token
+      localStorage.setItem('librarianToken', data.token)
+      localStorage.setItem('librarianInfo', JSON.stringify(data.librarian))
 
       // 记住工号
       if (rememberMe) {
