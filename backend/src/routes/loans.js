@@ -375,5 +375,52 @@ router.post('/return', requireLibrarianAuth, async (req, res, next) => {
     next(error);
   }
 });
+// 7. 按用户信息查找借阅记录（馆员专用）
+router.get('/search-loans', requireLibrarianAuth, async (req, res, next) => {
+  try {
+    const { keyword } = req.query;
+    if (!keyword || keyword.trim() === '') {
+      return res.status(400).json({ message: '请输入学号、姓名或邮箱' });
+    }
+
+    // 先查找匹配的用户
+    const users = await prisma.user.findMany({
+      where: {
+        role: 'STUDENT',
+        OR: [
+          { studentId: { contains: keyword } },
+          { name: { contains: keyword } },
+          { email: { contains: keyword.toLowerCase() } }
+        ]
+      },
+      select: { id: true, name: true, email: true, studentId: true }
+    });
+
+    if (users.length === 0) {
+      return res.json({ loans: [] });
+    }
+
+    // 查找这些用户的未归还借阅记录
+    const loans = await prisma.loan.findMany({
+      where: {
+        userId: { in: users.map(u => u.id) },
+        returnDate: null
+      },
+      include: {
+        user: {
+          select: { id: true, name: true, email: true, studentId: true }
+        },
+        copy: {
+          include: { book: { select: { id: true, title: true, author: true } } }
+        }
+      },
+      orderBy: { checkoutDate: 'desc' }
+    });
+
+    res.json({ loans });
+  } catch (error) {
+    next(error);
+  }
+});
 
 module.exports = router;

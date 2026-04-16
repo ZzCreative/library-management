@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 export default function LibrarianDashboard({ librarian, onLogout, onNavigateToBooks }) {
   const [showConfirm, setShowConfirm] = useState(false)
-  const [activeTab, setActiveTab] = useState('borrow') // borrow, return
+  const [activeTab, setActiveTab] = useState('borrow')
   
   // 借阅相关状态
   const [studentSearch, setStudentSearch] = useState('')
@@ -15,8 +15,10 @@ export default function LibrarianDashboard({ librarian, onLogout, onNavigateToBo
   const [loading, setLoading] = useState(false)
   
   // 归还相关状态
-  const [loanId, setLoanId] = useState('')
-  
+  const [returnSearch, setReturnSearch] = useState('')
+  const [returnLoans, setReturnLoans] = useState([])
+  const [returnSearched, setReturnSearched] = useState(false)
+
   // 搜索学生
   const searchStudents = async () => {
     if (!studentSearch.trim()) return
@@ -89,12 +91,26 @@ export default function LibrarianDashboard({ librarian, onLogout, onNavigateToBo
     setLoading(false)
   }
   
-  // 归还图书
-  const handleReturn = async () => {
-    if (!loanId.trim()) {
-      setMessage('请输入借阅ID')
-      return
+  // 按用户信息搜索借阅记录
+  const searchUserLoans = async () => {
+    if (!returnSearch.trim()) return
+    setLoading(true)
+    setReturnSearched(true)
+    const token = localStorage.getItem('librarianToken')
+    try {
+      const res = await fetch(`http://localhost:3001/loans/search-loans?keyword=${encodeURIComponent(returnSearch)}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      const data = await res.json()
+      setReturnLoans(data.loans || [])
+    } catch (err) {
+      setMessage('搜索失败')
     }
+    setLoading(false)
+  }
+
+  // 通过 loanId 归还
+  const handleReturnByLoanId = async (loanId) => {
     setLoading(true)
     const token = localStorage.getItem('librarianToken')
     try {
@@ -104,12 +120,14 @@ export default function LibrarianDashboard({ librarian, onLogout, onNavigateToBo
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ loanId: parseInt(loanId) })
+        body: JSON.stringify({ loanId })
       })
       const data = await res.json()
       if (res.ok) {
-        setMessage(`归还成功！借阅ID: ${loanId}`)
-        setLoanId('')
+        setMessage(`归还成功！`)
+        setReturnSearch('')
+        setReturnLoans([])
+        setReturnSearched(false)
       } else {
         setMessage(data.message || '归还失败')
       }
@@ -275,21 +293,46 @@ export default function LibrarianDashboard({ librarian, onLogout, onNavigateToBo
         
         {/* 归还图书界面 */}
         {activeTab === 'return' && (
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md mx-auto">
+          <div className="bg-white rounded-lg shadow-lg p-6">
             <h3 className="text-lg font-bold mb-4">↩️ 归还图书</h3>
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">借阅ID</label>
-              <input
-                type="number"
-                value={loanId}
-                onChange={(e) => setLoanId(e.target.value)}
-                placeholder="输入借阅记录ID"
-                className="w-full px-4 py-2 border rounded-lg"
-              />
+              <label className="block text-sm font-medium mb-2">学号 / 姓名 / 邮箱</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={returnSearch}
+                  onChange={(e) => setReturnSearch(e.target.value)}
+                  placeholder="输入学号、姓名或邮箱"
+                  className="flex-1 px-4 py-2 border rounded-lg"
+                />
+                <button onClick={searchUserLoans} disabled={loading} className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+                  搜索
+                </button>
+              </div>
             </div>
-            <button onClick={handleReturn} disabled={loading} className="w-full bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600">
-              {loading ? '处理中...' : '确认归还'}
-            </button>
+            
+            {returnLoans.length > 0 && (
+              <div className="mt-4 border rounded-lg divide-y">
+                {returnLoans.map(loan => (
+                  <div key={loan.id} className="p-3 flex justify-between items-center flex-wrap gap-2">
+                    <div>
+                      <p className="font-medium">{loan.copy?.book?.title || '未知图书'}</p>
+                      <p className="text-sm text-gray-500">
+                        借阅人: {loan.user?.name} ({loan.user?.studentId})<br/>
+                        借书日期: {new Date(loan.checkoutDate).toLocaleDateString()} | 应还日期: {new Date(loan.dueDate).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <button onClick={() => handleReturnByLoanId(loan.id)} className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600">
+                      确认归还
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {returnSearched && returnLoans.length === 0 && (
+              <p className="text-center text-gray-500 mt-4">未找到借阅记录</p>
+            )}
           </div>
         )}
       </main>
