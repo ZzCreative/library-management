@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import LibrarianMessages from './LibrarianMessages'
 
 export default function LibrarianDashboard({ librarian, onLogout, onNavigateToBooks }) {
   const [showConfirm, setShowConfirm] = useState(false)
@@ -206,6 +207,15 @@ export default function LibrarianDashboard({ librarian, onLogout, onNavigateToBo
               进入 →
             </button>
           </div>
+
+          <div className="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition">
+            <div className="text-4xl mb-4">💬</div>
+            <h2 className="text-xl font-bold mb-2">消息回复</h2>
+            <p className="text-gray-500 text-sm mb-4">查看读者留言并直接回复</p>
+            <button onClick={() => setActiveTab('messages')} className="w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition">
+              打开消息
+            </button>
+          </div>
         </div>
         
         {message && (
@@ -335,6 +345,8 @@ export default function LibrarianDashboard({ librarian, onLogout, onNavigateToBo
             )}
           </div>
         )}
+
+        {activeTab === 'messages' && <LibrarianMessages />}
       </main>
       
       {showConfirm && (
