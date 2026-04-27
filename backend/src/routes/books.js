@@ -17,19 +17,6 @@ const BOOK_SELECT = {
 };
 
 const BOOK_DETAIL_INCLUDE = {
-  loans: {
-    orderBy: { checkoutDate: 'desc' },
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          studentId: true,
-        },
-      },
-    },
-  },
   ratings: {
     orderBy: { createdAt: 'desc' },
     include: {
@@ -69,9 +56,25 @@ const BOOK_DETAIL_INCLUDE = {
       },
     },
   },
+  copies: {
+    include: {
+      loans: {
+        orderBy: { checkoutDate: 'desc' },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              studentId: true,
+            },
+          },
+        },
+      },
+    },
+  },
   _count: {
     select: {
-      loans: true,
       ratings: true,
       holds: true,
       wishlists: true,
@@ -145,20 +148,20 @@ router.get('/', async (req, res) => {
 router.get('/search', async (req, res) => {
   try {
     const { title, author, keyword } = req.query;
-    
+
     const whereCondition = {};
-    
+
     if (title || author || keyword) {
       whereCondition.OR = [];
-      
+
       if (title) {
         whereCondition.OR.push({ title: { contains: title } });
       }
-      
+
       if (author) {
         whereCondition.OR.push({ author: { contains: author } });
       }
-      
+
       if (keyword) {
         whereCondition.OR.push(
           { title: { contains: keyword } },
@@ -166,34 +169,44 @@ router.get('/search', async (req, res) => {
         );
       }
     }
-    
+
     const books = await prisma.book.findMany({
       where: whereCondition,
       orderBy: { id: 'asc' },
       include: {
         copies: {
           where: { status: 'AVAILABLE' }
-        }
+        },
+        ratings: true
       }
     });
-    
-    const booksWithCount = books.map(book => ({
-      id: book.id,
-      title: book.title,
-      author: book.author,
-      isbn: book.isbn,
-      genre: book.genre,
-      description: book.description,
-      language: book.language,
-      createdAt: book.createdAt,
-      availableCopies: book.copies.length,
-      totalCopies: book.copies.length
-    }));
-    
-    res.json({ 
-      success: true, 
+
+    const booksWithCount = books.map(book => {
+      const ratingCount = book.ratings.length;
+      const averageRating = ratingCount === 0
+        ? null
+        : Number((book.ratings.reduce((sum, rating) => sum + rating.stars, 0) / ratingCount).toFixed(1));
+
+      return {
+        id: book.id,
+        title: book.title,
+        author: book.author,
+        isbn: book.isbn,
+        genre: book.genre,
+        description: book.description,
+        language: book.language,
+        createdAt: book.createdAt,
+        availableCopies: book.copies.length,
+        totalCopies: book.copies.length,
+        averageRating,
+        totalRatings: ratingCount
+      };
+    });
+
+    res.json({
+      success: true,
       data: booksWithCount,
-      count: booksWithCount.length 
+      count: booksWithCount.length
     });
   } catch (error) {
     res.status(500).json({
@@ -218,7 +231,16 @@ router.get('/:id', async (req, res) => {
       include: {
         ...BOOK_DETAIL_INCLUDE,
         copies: {
-          select: { id: true, barcode: true, floor: true, libraryArea: true, shelfNo: true, shelfLevel: true, status: true }
+          include: {
+            loans: {
+              orderBy: { checkoutDate: 'desc' },
+              include: {
+                user: {
+                  select: { id: true, name: true, email: true, studentId: true }
+                }
+              }
+            }
+          }
         }
       }
     });
@@ -235,6 +257,10 @@ router.get('/:id', async (req, res) => {
 
     const availableCopies = book.copies.filter(c => c.status === 'AVAILABLE').length;
 
+    const allLoans = book.copies.flatMap(copy => copy.loans || []);
+    const activeLoans = allLoans.filter(loan => !loan.returnDate).length;
+    const returnedLoans = allLoans.filter(loan => Boolean(loan.returnDate)).length;
+
     res.json({
       success: true,
       data: {
@@ -243,8 +269,8 @@ router.get('/:id', async (req, res) => {
         totalCopies: book.copies.length,
         stats: {
           averageRating,
-          activeLoans: book.loans.filter((loan) => !loan.returnDate).length,
-          returnedLoans: book.loans.filter((loan) => Boolean(loan.returnDate)).length,
+          activeLoans,
+          returnedLoans,
         },
       },
     });
