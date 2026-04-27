@@ -10,6 +10,7 @@ import LibrarianApp from './librarian/LibrarianApp';
 import Announcements from './pages/Announcements';
 import AdminAnnouncements from './pages/AdminAnnouncements';
 import UserManagement from './pages/UserManagement';
+import Messages from './pages/Messages';
 
 function App() {
   const navigate = useNavigate();
@@ -60,11 +61,12 @@ function App() {
               <div style={{ display: 'flex', gap: '20px' }}>
                 <button onClick={() => setActiveTab('search')} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', borderBottom: activeTab === 'search' ? '2px solid white' : 'none' }}>Search Books</button>
                 <button onClick={() => setActiveTab('history')} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', borderBottom: activeTab === 'history' ? '2px solid white' : 'none' }}>My History</button>
+                <button onClick={() => setActiveTab('messages')} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', borderBottom: activeTab === 'messages' ? '2px solid white' : 'none' }}>Messages</button>
                 <button onClick={handleLogout} style={{ padding: '5px 10px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Logout</button>
               </div>
             </div>
             <div style={{ padding: '20px' }}>
-              {activeTab === 'search' ? <BookSearch /> : <MyHistory />}
+              {activeTab === 'search' ? <BookSearch /> : activeTab === 'history' ? <MyHistory /> : <Messages />}
             </div>
           </div>
         ) : (

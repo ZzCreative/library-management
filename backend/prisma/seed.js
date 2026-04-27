@@ -3,59 +3,27 @@ const bcrypt = require('bcrypt');
 const prisma = new PrismaClient();
 
 async function main() {
-  // 清空现有数据（注意顺序：先删除依赖表）
+  // 只清空书籍相关的记录（注意顺序：先删除依赖表）
   await prisma.loan.deleteMany();
   await prisma.copy.deleteMany();
-  await prisma.auditLog.deleteMany();
   await prisma.hold.deleteMany();
   await prisma.wishlist.deleteMany();
   await prisma.rating.deleteMany();
   await prisma.book.deleteMany();
-  await prisma.user.deleteMany();
-  await prisma.config.deleteMany();
 
-  // 创建用户
-  const adminPassword = await bcrypt.hash('admin123', 10);
-  const librarianPassword = await bcrypt.hash('lib123', 10);
-  const studentPassword = await bcrypt.hash('student123', 10);
-
-  await prisma.user.create({
-    data: {
-      name: 'Admin User',
-      email: 'admin@library.com',
-      passwordHash: adminPassword,
-      role: 'ADMIN',
-    },
+  // 检查是否存在配置项，如果不存在则添加
+  const existingConfig = await prisma.config.findFirst({
+    where: { key: 'FINE_RATE_PER_DAY' }
   });
 
-  await prisma.user.create({
-    data: {
-      name: 'Librarian User',
-      email: 'librarian@library.com',
-      passwordHash: librarianPassword,
-      role: 'LIBRARIAN',
-    },
-  });
-
-  await prisma.user.create({
-    data: {
-      name: 'Student One',
-      email: 'student1@university.edu',
-      passwordHash: studentPassword,
-      studentId: 'S12345',
-      role: 'STUDENT',
-    },
-  });
-
-  await prisma.user.create({
-    data: {
-      name: 'Student Two',
-      email: 'student2@university.edu',
-      passwordHash: studentPassword,
-      studentId: 'S67890',
-      role: 'STUDENT',
-    },
-  });
+  if (!existingConfig) {
+    await prisma.config.create({
+      data: {
+        key: 'FINE_RATE_PER_DAY',
+        value: '0.50',
+      },
+    });
+  }
 
   // 图书数据
   const booksData = [
