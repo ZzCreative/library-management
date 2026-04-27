@@ -7,6 +7,12 @@ function MyHistory() {
   const [error, setError] = useState(null);
   const [message, setMessage] = useState('');
   const [user, setUser] = useState(null);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [selectedBook, setSelectedBook] = useState(null);
+  const [rating, setRating] = useState(0);
+  const [review, setReview] = useState('');
+  const [userRatings, setUserRatings] = useState({});
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -19,6 +25,7 @@ function MyHistory() {
       }
     }
     fetchHistory();
+    fetchUserRatings();
   }, []);
 
   const fetchHistory = async () => {
@@ -40,6 +47,27 @@ function MyHistory() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUserRatings = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const response = await fetch('http://localhost:3001/api/ratings/user/me', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const ratingsMap = {};
+        data.ratings.forEach(r => {
+          ratingsMap[r.bookId] = r;
+        });
+        setUserRatings(ratingsMap);
+      }
+    } catch (error) {
+      console.error('Failed to fetch user ratings:', error);
     }
   };
 
@@ -87,6 +115,77 @@ function MyHistory() {
     setTimeout(() => setMessage(''), 3000);
   };
 
+  const openRatingModal = (loan) => {
+    const bookId = loan.copy?.book?.id;
+    const existingRating = userRatings[bookId];
+    setSelectedBook(loan);
+    setRating(existingRating ? existingRating.stars : 0);
+    setReview(existingRating ? existingRating.review || '' : '');
+    setShowRatingModal(true);
+  };
+
+  const handleSubmitRating = async () => {
+    if (rating === 0) {
+      setMessage('请选择评分');
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    setSubmitting(true);
+
+    try {
+      const bookId = selectedBook.copy?.book?.id;
+      const response = await fetch('http://localhost:3001/api/ratings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          bookId,
+          stars: rating,
+          review: review.trim() || null
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setMessage(userRatings[bookId] ? '评价已更新！' : '评价已提交！');
+        setShowRatingModal(false);
+        fetchUserRatings();
+      } else {
+        setMessage(data.message || '评价失败');
+      }
+    } catch (error) {
+      setMessage('评价失败');
+    }
+    setSubmitting(false);
+    setTimeout(() => setMessage(''), 3000);
+  };
+
+  const handleDeleteRating = async (bookId) => {
+    const token = localStorage.getItem('token');
+    const ratingId = userRatings[bookId]?.id;
+    if (!ratingId) return;
+
+    try {
+      const response = await fetch(`http://localhost:3001/api/ratings/${ratingId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setMessage('评价已删除');
+        fetchUserRatings();
+      } else {
+        setMessage(data.message || '删除失败');
+      }
+    } catch (error) {
+      setMessage('删除失败');
+    }
+    setTimeout(() => setMessage(''), 3000);
+  };
+
   const getStatusText = (loan) => {
     if (loan.returnDate) return '已归还';
     const dueDate = new Date(loan.dueDate);
@@ -108,6 +207,12 @@ function MyHistory() {
     return (loan.renewCount || 0) < 2;
   };
 
+  const canRate = (loan) => {
+    if (!loan.returnDate) return false;
+    const bookId = loan.copy?.book?.id;
+    return !!bookId;
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -119,6 +224,25 @@ function MyHistory() {
     if (hour < 12) return '早上好';
     if (hour < 18) return '下午好';
     return '晚上好';
+  };
+
+  const StarRating = ({ value, onChange, interactive = false, size = 'md' }) => {
+    const sizeClass = size === 'sm' ? 'text-lg' : 'text-2xl';
+    return (
+      <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <span
+            key={star}
+            onClick={() => interactive && onChange && onChange(star)}
+            className={`${sizeClass} cursor-pointer transition-colors ${
+              star <= value ? 'text-yellow-400' : 'text-gray-300'
+            } ${interactive ? 'hover:text-yellow-300' : ''}`}
+          >
+            ★
+          </span>
+        ))}
+      </div>
+    );
   };
 
   if (loading) {
@@ -185,7 +309,7 @@ function MyHistory() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div 
+          <div
             onClick={() => navigate('/')}
             className="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition cursor-pointer"
           >
@@ -196,8 +320,8 @@ function MyHistory() {
               进入 →
             </button>
           </div>
-          
-          <div 
+
+          <div
             onClick={() => navigate('/history')}
             className={`bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition cursor-pointer ${true ? 'ring-2 ring-blue-500' : ''}`}
           >
@@ -209,7 +333,7 @@ function MyHistory() {
             </button>
           </div>
 
-          <div 
+          <div
             onClick={() => navigate('/announcements')}
             className="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition cursor-pointer"
           >
@@ -223,11 +347,11 @@ function MyHistory() {
         </div>
 
         {message && (
-          <div className={`p-4 mb-6 rounded-lg ${message.includes('成功') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+          <div className={`p-4 mb-6 rounded-lg ${message.includes('成功') || message.includes('已') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
             {message}
           </div>
         )}
-        
+
         {history.length === 0 ? (
           <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
             暂无借阅记录
@@ -248,46 +372,124 @@ function MyHistory() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {history.map((loan) => (
-                    <tr key={loan.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{loan.copy?.book?.title || 'Unknown'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{loan.copy?.book?.author || 'Unknown'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(loan.checkoutDate).toLocaleDateString()}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(loan.dueDate).toLocaleDateString()}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{loan.returnDate ? new Date(loan.returnDate).toLocaleDateString() : '-'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-medium text-white rounded-full ${getStatusColor(loan)}`}>
-                          {getStatusText(loan)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {!loan.returnDate && (
-                          <div className="flex gap-2">
-                            {canRenew(loan) && (
+                  {history.map((loan) => {
+                    const bookId = loan.copy?.book?.id;
+                    const existingRating = userRatings[bookId];
+                    return (
+                      <tr key={loan.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{loan.copy?.book?.title || 'Unknown'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{loan.copy?.book?.author || 'Unknown'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(loan.checkoutDate).toLocaleDateString()}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(loan.dueDate).toLocaleDateString()}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{loan.returnDate ? new Date(loan.returnDate).toLocaleDateString() : '-'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 text-xs font-medium text-white rounded-full ${getStatusColor(loan)}`}>
+                            {getStatusText(loan)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {loan.returnDate ? (
+                            <div className="flex flex-col gap-1">
+                              {existingRating ? (
+                                <div className="flex items-center gap-2">
+                                  <StarRating value={existingRating.stars} size="sm" />
+                                  <button
+                                    onClick={() => openRatingModal(loan)}
+                                    className="text-xs text-blue-500 hover:text-blue-700"
+                                  >
+                                    编辑
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteRating(bookId)}
+                                    className="text-xs text-red-500 hover:text-red-700"
+                                  >
+                                    删除
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => openRatingModal(loan)}
+                                  className="px-2 py-1 bg-yellow-400 text-white text-xs rounded hover:bg-yellow-500 transition"
+                                >
+                                  ⭐ 评分与评价
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex gap-2">
+                              {canRenew(loan) && (
+                                <button
+                                  onClick={() => handleRenew(loan.copyId)}
+                                  className="px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 transition"
+                                >
+                                  续借
+                                </button>
+                              )}
                               <button
-                                onClick={() => handleRenew(loan.copyId)}
-                                className="px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 transition"
+                                onClick={() => handleReturn(loan.id)}
+                                className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition"
                               >
-                                续借
+                                归还
                               </button>
-                            )}
-                            <button
-                              onClick={() => handleReturn(loan.id)}
-                              className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition"
-                            >
-                              归还
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
         )}
       </main>
+
+      {showRatingModal && selectedBook && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">评分与评价</h2>
+            <p className="text-gray-600 mb-2">
+              <strong>书籍：</strong>{selectedBook.copy?.book?.title}
+            </p>
+            <p className="text-gray-600 mb-4">
+              <strong>作者：</strong>{selectedBook.copy?.book?.author}
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">评分（1-5星）</label>
+              <StarRating value={rating} onChange={setRating} interactive size="lg" />
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">评价（可选）</label>
+              <textarea
+                value={review}
+                onChange={(e) => setReview(e.target.value)}
+                placeholder="分享您的阅读心得..."
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 resize-none"
+                rows={4}
+              />
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowRatingModal(false)}
+                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition"
+                disabled={submitting}
+              >
+                取消
+              </button>
+              <button
+                onClick={handleSubmitRating}
+                disabled={submitting || rating === 0}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? '提交中...' : '提交评价'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,11 +9,11 @@ const MAX_BORROW_LIMIT = 5;
 const MAX_RENEW_COUNT = 2;
 const RENEW_DAYS = 14;
 
-// 获取我的借阅列表
+// 获取我的借阅列表（包括已归还和未归还）
 router.get('/my-borrows', requireAuth, async (req, res) => {
   try {
     const loans = await prisma.loan.findMany({
-      where: { userId: req.user.id, returnDate: null },
+      where: { userId: req.user.id },
       include: {
         copy: {
           include: { book: true }
@@ -133,7 +133,7 @@ router.post('/borrow/:copyId', requireAuth, async (req, res) => {
 router.post('/renew', requireAuth, async (req, res) => {
   try {
     const { copyId } = req.body;
-    
+
     if (!copyId) {
       return res.status(400).json({ message: '请提供副本ID' });
     }
@@ -160,14 +160,14 @@ router.post('/renew', requireAuth, async (req, res) => {
 
     await prisma.loan.update({
       where: { id: loan.id },
-      data: { 
+      data: {
         dueDate: newDueDate,
         renewCount: currentRenewCount + 1
       }
     });
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: '续借成功',
       newDueDate: newDueDate,
       renewCount: currentRenewCount + 1
