@@ -3,6 +3,7 @@ import { Routes, Route, useNavigate } from 'react-router-dom';
 import BookSearch from './pages/BookSearch';
 import HomePage from './pages/HomePage';
 import MyHistory from './reader/MyHistory';
+import MyReservations from './reader/MyReservations';
 import UnifiedLogin from './pages/UnifiedLogin';
 import Register from './pages/Register';
 import AdminDashboard from './pages/AdminDashboard';
@@ -16,12 +17,10 @@ import SystemConfig from './pages/SystemConfig';
 import AdminBackupPage from './pages/AdminBackupPage';
 import AdminBlocklist from './pages/AdminBlocklist';
 
-
 function App() {
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('search');
 
   useEffect(() => {
     const token = localStorage.getItem('token') || localStorage.getItem('librarianToken');
@@ -41,16 +40,15 @@ function App() {
     localStorage.removeItem('librarianToken');
     localStorage.removeItem('librarianInfo');
     setIsLoggedIn(false);
-    setActiveTab('search');
     navigate('/login');
   };
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div className="flex items-center justify-center min-h-screen">加载中...</div>;
 
   return (
     <Routes>
       <Route path="/register" element={<Register />} />
-      <Route path="/login" element={<UnifiedLogin />} />
+      <Route path="/login" element={<UnifiedLogin onLogin={handleLogin} />} />
       <Route path="/librarian-login" element={<LibrarianApp />} />
       <Route path="/admin-dashboard" element={<AdminDashboard />} />
       <Route path="/admin-logs" element={<SystemLogs />} />
@@ -58,15 +56,19 @@ function App() {
       <Route path="/announcements" element={<Announcements />} />
       <Route path="/admin/announcements" element={<AdminAnnouncements />} />
       <Route path="/history" element={<MyHistory />} />
+      <Route path="/my-reservations" element={<MyReservations />} />
       <Route path="/messages" element={<Messages />} />
       <Route path="/search" element={<BookSearch />} />
-      <Route path="/" element={
-        isLoggedIn ? (
-          <HomePage />
-        ) : (
-          <UnifiedLogin />
-        )
-      } />
+      <Route
+        path="/"
+        element={
+          isLoggedIn ? (
+            <HomePage onLogout={handleLogout} />
+          ) : (
+            <UnifiedLogin onLogin={handleLogin} />
+          )
+        }
+      />
       <Route path="/admin/config" element={<SystemConfig />} />
       <Route path="/admin/backups" element={<AdminBackupPage />} />
       <Route path="/admin/blocklist" element={<AdminBlocklist />} />
