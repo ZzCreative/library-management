@@ -15,7 +15,6 @@ function MyHistory() {
   const [review, setReview] = useState('');
   const [userRatings, setUserRatings] = useState({});
   const [submitting, setSubmitting] = useState(false);
-  // 支付相关状态
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState(0);
@@ -196,18 +195,16 @@ function MyHistory() {
   const handleReturn = async (loanId) => {
     const loan = history.find(l => l.id === loanId);
     
-    // 如果有罚款需要支付，先显示支付弹窗，不立即归还
     if (needsFinePayment(loan)) {
       setSelectedLoan(loan);
       setPaymentAmount(getEstimatedFine(loan));
       setPaymentMethod('alipay');
       setPaymentSuccess(false);
-      setPendingReturnLoan(loanId); // 标记这是待归还的订单
+      setPendingReturnLoan(loanId);
       setShowPaymentModal(true);
       return;
     }
     
-    // 没有罚款，直接执行归还
     const token = localStorage.getItem('token');
     try {
       const response = await fetch(`http://localhost:3001/api/reader/return/${loanId}`, {
@@ -251,7 +248,7 @@ function MyHistory() {
 
   const closePaymentModal = () => {
     setShowPaymentModal(false);
-    setPendingReturnLoan(null); // 取消支付时清空待归还状态
+    setPendingReturnLoan(null);
   };
 
   const openRatingModal = (loan) => {
@@ -401,8 +398,18 @@ function MyHistory() {
       <DueReminderBanner />
 
       <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg shadow-lg p-6 mb-8 text-white">
-        <h2 className="text-2xl font-bold mb-2">借阅记录</h2>
-        <p className="opacity-90">查看和管理您的借阅记录</p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold mb-2">借阅记录</h2>
+            <p className="opacity-90">查看和管理您的借阅记录</p>
+          </div>
+          <button
+            onClick={() => navigate('/my-reservations')}
+            className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition flex items-center gap-2"
+          >
+            📅 我的预约
+          </button>
+        </div>
       </div>
 
       {message && (
