@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const UnifiedLogin = () => {
+  const navigate = useNavigate();
   const [role, setRole] = useState('reader');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,7 +38,6 @@ const UnifiedLogin = () => {
     setLoading(true);
 
     try {
-      let apiEndpoint = 'http://localhost:3001/api/auth/login';
       let requestBody = {};
 
       if (role === 'reader') {
@@ -46,10 +47,10 @@ const UnifiedLogin = () => {
           type: 'student'
         };
       } else if (role === 'librarian') {
-        apiEndpoint = 'http://localhost:3001/api/auth/login-librarian';
         requestBody = {
-          employeeId: employeeId || email,
-          password: password
+          email: employeeId || email,
+          password: password,
+          type: 'librarian'
         };
       } else if (role === 'admin') {
         requestBody = {
@@ -59,7 +60,7 @@ const UnifiedLogin = () => {
         };
       }
 
-      const res = await fetch(apiEndpoint, {
+      const res = await fetch('http://localhost:3001/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)
@@ -81,21 +82,21 @@ const UnifiedLogin = () => {
       setBannedInfo(null);
 
       if (role === 'librarian') {
-        localStorage.setItem('librarianToken', data.token);
-        localStorage.setItem('librarianInfo', JSON.stringify(data.librarian));
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.librarian));
         if (rememberMe) {
           localStorage.setItem('savedEmployeeId', employeeId || email);
         } else {
           localStorage.removeItem('savedEmployeeId');
         }
-        window.location.href = '/librarian-login';
+        navigate('/librarian-login');
       } else {
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
         if (role === 'admin') {
-          window.location.href = '/admin-dashboard';
+          navigate('/admin-dashboard');
         } else {
-          window.location.href = '/';
+          navigate('/');
         }
       }
     } catch (err) {
@@ -287,6 +288,18 @@ const UnifiedLogin = () => {
               <a href="/register" className="text-blue-500 hover:text-blue-600 font-medium">
                 立即注册
               </a>
+            </p>
+          )}
+          {role === 'librarian' && (
+            <p className="text-center text-gray-500 text-sm mt-6">
+              还没有馆员账号？{' '}
+              <button
+                type="button"
+                onClick={() => navigate('/librarian-login?register=true')}
+                className="text-blue-500 hover:text-blue-600 font-medium"
+              >
+                点击注册
+              </button>
             </p>
           )}
         </div>

@@ -1,14 +1,21 @@
 import { useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import LibrarianLogin from './LibrarianLogin'
 import LibrarianRegister from './LibrarianRegister'
 import LibrarianDashboard from './LibrarianDashboard'
 import { isAuthenticated, logout } from './api'  // 改为新函数
 
 function LibrarianApp() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [librarian, setLibrarian] = useState(null)
-  const [showRegister, setShowRegister] = useState(false)
+  const [showRegister, setShowRegister] = useState(() => new URLSearchParams(location.search).get('register') === 'true')
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setShowRegister(new URLSearchParams(location.search).get('register') === 'true')
+  }, [location.search])
 
   useEffect(() => {
     // 检查登录状态 - 使用新函数
@@ -44,6 +51,7 @@ function LibrarianApp() {
     logout()  // 使用新函数
     setIsLoggedIn(false)
     setLibrarian(null)
+    navigate('/login')
   }
 
   const handleRegisterSuccess = () => {
@@ -66,7 +74,7 @@ function LibrarianApp() {
     return (
       <LibrarianRegister 
         onRegister={handleRegisterSuccess} 
-        onSwitchToLogin={() => setShowRegister(false)} 
+        onSwitchToLogin={() => navigate('/login')} 
       />
     )
   }
